@@ -896,7 +896,7 @@
       const now = audioCtx.currentTime;
       const output = audioCtx.createGain();
       output.gain.setValueAtTime(0.0001, now);
-      output.gain.exponentialRampToValueAtTime(0.32, now + 0.008);
+      output.gain.exponentialRampToValueAtTime(0.52, now + 0.008);
       output.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
       output.connect(audioCtx.destination);
 
