@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YPF 360° | Mapa interactivo</title>
+  <meta name="description" content="Mapa interactivo académico sobre YPF, Derecho de Minería y Energía, Vaca Muerta, RIGI, ambiente y soberanía energética." />
+  <style>
+    :root {
+      --bg: #06182d;
+      --bg2: #09213d;
+      --panel: rgba(10, 35, 62, 0.82);
+      --panel2: rgba(255,255,255,0.08);
+      --line: rgba(120, 190, 255, 0.36);
+      --text: #f4f8ff;
+      --muted: #b8cbe0;
+      --blue: #19a7ff;
+      --cyan: #61d3ff;
+      --gold: #f5b942;
+      --green: #42d48b;
+      --danger: #ff6b6b;
+      --shadow: 0 24px 70px rgba(0, 0, 0, .38);
+      --radius: 22px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 20% 12%, rgba(25, 167, 255, .22), transparent 34%),
+        radial-gradient(circle at 78% 28%, rgba(66, 212, 139, .12), transparent 30%),
+        radial-gradient(circle at 50% 100%, rgba(245, 185, 66, .12), transparent 26%),
+        linear-gradient(135deg, #04101f 0%, var(--bg) 48%, #03101d 100%);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .18;
+      background-image:
+        linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: linear-gradient(to bottom, black 0%, transparent 92%);
+    }
+
+    header {
+      width: min(1180px, calc(100% - 30px));
+      margin: 0 auto;
+      padding: 30px 0 10px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 12px 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.055);
+      backdrop-filter: blur(14px);
+      border-radius: 999px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.18);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .logo {
+      width: 54px;
+      height: 36px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      letter-spacing: .5px;
+      color: #fff;
+      background: linear-gradient(135deg, #005aa9 0%, #009fe3 100%);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.24), 0 12px 24px rgba(0, 90, 169, .35);
+    }
+
+    .brand small {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.25;
+    }
+
+    .course {
+      font-size: 13px;
+      color: var(--muted);
+      text-align: right;
+      line-height: 1.35;
+    }
+
+    .hero {
+      padding: 42px 0 26px;
+      text-align: center;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 13px;
+      border: 1px solid rgba(97, 211, 255, .35);
+      border-radius: 999px;
+      color: #d8f2ff;
+      font-size: 13px;
+      background: rgba(97, 211, 255, .08);
+    }
+
+    .eyebrow span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 18px var(--green);
+    }
+
+    h1 {
+      margin: 18px auto 12px;
+      max-width: 1000px;
+      font-size: clamp(38px, 7vw, 76px);
+      line-height: .92;
+      letter-spacing: -2.5px;
+      text-transform: uppercase;
+    }
+
+    .gradient-text {
+      background: linear-gradient(92deg, #fff, #9fe5ff 48%, #fbd37e);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .subtitle {
+      max-width: 880px;
+      margin: 0 auto;
+      color: var(--muted);
+      font-size: clamp(16px, 2.3vw, 22px);
+      line-height: 1.45;
+    }
+
+    .container {
+      width: min(1180px, calc(100% - 30px));
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .universe-wrap {
+      margin: 18px auto 34px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: calc(var(--radius) + 8px);
+      background: rgba(255,255,255,.045);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .universe-wrap::before {
+      content: "";
+      position: absolute;
+      inset: -50% -20%;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(25, 167, 255, .11), transparent 38%),
+        conic-gradient(from 180deg, transparent, rgba(97, 211, 255, .12), transparent, rgba(245,185,66,.08), transparent);
+      animation: rotate 22s linear infinite;
+      opacity: .55;
+    }
+
+    @keyframes rotate {
+      to { transform: rotate(360deg); }
+    }
+
+    .universe {
+      min-height: 710px;
+      position: relative;
+      display: grid;
+      place-items: center;
+      padding: 42px 22px;
+      isolation: isolate;
+    }
+
+    .orbit {
+      position: absolute;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      z-index: -1;
+    }
+
+    .orbit.one { width: min(72vw, 780px); height: min(72vw, 780px); max-width: 780px; max-height: 780px; }
+    .orbit.two { width: min(54vw, 580px); height: min(54vw, 580px); max-width: 580px; max-height: 580px; }
+    .orbit.three { width: min(35vw, 380px); height: min(35vw, 380px); max-width: 380px; max-height: 380px; }
+
+    .center-card {
+      width: min(310px, 80vw);
+      aspect-ratio: 1 / 1;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 30% 20%, rgba(255,255,255,.35), transparent 22%),
+        linear-gradient(135deg, #005aa9, #009fe3 62%, #023d78);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,.25);
+      box-shadow: 0 24px 75px rgba(0, 159, 227, .34), inset 0 0 50px rgba(255,255,255,.09);
+      z-index: 2;
+      padding: 32px;
+    }
+
+    .center-card strong {
+      font-size: clamp(58px, 11vw, 86px);
+      line-height: .82;
+      letter-spacing: -4px;
+      display: block;
+    }
+
+    .center-card span {
+      display: block;
+      margin-top: 14px;
+      font-size: 15px;
+      line-height: 1.35;
+      color: #e9f8ff;
+      font-weight: 650;
+    }
+
+    .node {
+      position: absolute;
+      width: 178px;
+      min-height: 94px;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 18px;
+      background: rgba(6, 24, 45, .84);
+      color: var(--text);
+      box-shadow: 0 15px 36px rgba(0,0,0,.28);
+      backdrop-filter: blur(12px);
+      padding: 13px 13px 12px;
+      text-align: left;
+      cursor: pointer;
+      transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+    }
+
+    .node:hover,
+    .node:focus {
+      outline: none;
+      transform: translateY(-5px) scale(1.02);
+      border-color: rgba(97, 211, 255, .66);
+      background: rgba(10, 45, 78, .92);
+      box-shadow: 0 18px 40px rgba(0, 159, 227, .24);
+    }
+
+    .node .icon {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      margin-bottom: 8px;
+      background: rgba(97, 211, 255, .1);
+      color: var(--cyan);
+      font-size: 20px;
+      border: 1px solid rgba(97, 211, 255, .22);
+    }
+
+    .node h3 {
+      margin: 0 0 5px;
+      font-size: 15px;
+      line-height: 1.12;
+    }
+
+    .node p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.28;
+    }
+
+    .node::after {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      pointer-events: none;
+      background: linear-gradient(135deg, rgba(97,211,255,.22), transparent 32%, rgba(245,185,66,.12));
+      opacity: .55;
+      mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      padding: 1px;
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+    }
+
+    .n1 { top: 8%; left: 50%; transform: translateX(-50%); }
+    .n1:hover, .n1:focus { transform: translateX(-50%) translateY(-5px) scale(1.02); }
+
+    .n2 { top: 17%; right: 9%; }
+    .n3 { top: 44%; right: 2.5%; }
+    .n4 { bottom: 16%; right: 10%; }
+    .n5 { bottom: 7%; left: 50%; transform: translateX(-50%); }
+    .n5:hover, .n5:focus { transform: translateX(-50%) translateY(-5px) scale(1.02); }
+    .n6 { bottom: 16%; left: 10%; }
+    .n7 { top: 44%; left: 2.5%; }
+    .n8 { top: 17%; left: 9%; }
+    .n9 { top: 30%; left: 31%; }
+    .n10 { top: 30%; right: 31%; }
+
+    .hint {
+      position: absolute;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      color: rgba(244,248,255,.78);
+      font-size: 13px;
+      padding: 9px 13px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.065);
+      border: 1px solid rgba(255,255,255,.12);
+    }
+
+    .info-row {
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 18px;
+      margin: 0 0 28px;
+    }
+
+    .box {
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.055);
+      border-radius: var(--radius);
+      padding: 22px;
+      box-shadow: 0 12px 34px rgba(0,0,0,.16);
+    }
+
+    .box h2 {
+      margin: 0 0 12px;
+      font-size: 22px;
+      letter-spacing: -.2px;
+    }
+
+    .box p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-top: 14px;
+    }
+
+    .chip {
+      border: 1px solid rgba(97,211,255,.22);
+      background: rgba(97,211,255,.08);
+      color: #d9f4ff;
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+    }
+
+    .members {
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .members strong {
+      color: var(--text);
+    }
+
+    footer {
+      width: min(1180px, calc(100% - 30px));
+      margin: 0 auto;
+      padding: 8px 0 30px;
+      color: rgba(244,248,255,.65);
+      text-align: center;
+      font-size: 13px;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(0,0,0,.52);
+      backdrop-filter: blur(8px);
+      z-index: 20;
+    }
+
+    .overlay.show {
+      display: flex;
+    }
+
+    .modal {
+      width: min(720px, 100%);
+      max-height: min(78vh, 720px);
+      overflow: auto;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(97,211,255,.14), transparent 30%),
+        linear-gradient(145deg, rgba(8, 29, 53, .98), rgba(4, 18, 34, .98));
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 26px;
+      box-shadow: 0 35px 90px rgba(0,0,0,.55);
+      padding: 24px;
+      position: relative;
+      animation: pop .18s ease both;
+    }
+
+    @keyframes pop {
+      from { opacity: 0; transform: translateY(8px) scale(.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .modal-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    .modal-icon {
+      width: 52px;
+      height: 52px;
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      background: rgba(97,211,255,.1);
+      border: 1px solid rgba(97,211,255,.25);
+      font-size: 28px;
+      flex: 0 0 auto;
+    }
+
+    .modal-title-wrap {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .modal h2 {
+      margin: 0;
+      font-size: clamp(24px, 4vw, 34px);
+      letter-spacing: -.6px;
+    }
+
+    .modal .tag {
+      display: inline-flex;
+      margin-top: 9px;
+      color: #d9f4ff;
+      background: rgba(97,211,255,.09);
+      border: 1px solid rgba(97,211,255,.22);
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .close {
+      border: 0;
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.08);
+      color: #fff;
+      font-size: 24px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .close:hover,
+    .close:focus {
+      outline: 2px solid rgba(97,211,255,.45);
+      background: rgba(255,255,255,.12);
+    }
+
+    .modal p {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.65;
+      margin: 14px 0 0;
+    }
+
+    .modal .key {
+      margin-top: 18px;
+      padding: 14px 15px;
+      border-radius: 18px;
+      background: rgba(245, 185, 66, .09);
+      border: 1px solid rgba(245, 185, 66, .24);
+      color: #ffe8a9;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .modal .legal {
+      margin-top: 14px;
+      padding: 14px 15px;
+      border-radius: 18px;
+      background: rgba(66, 212, 139, .08);
+      border: 1px solid rgba(66, 212, 139, .2);
+      color: #d8ffe9;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    .next-btn {
+      border: 1px solid rgba(97,211,255,.25);
+      color: #e9f8ff;
+      background: rgba(97,211,255,.08);
+      padding: 10px 13px;
+      border-radius: 14px;
+      cursor: pointer;
+      font-weight: 650;
+    }
+
+    .next-btn:hover {
+      background: rgba(97,211,255,.14);
+    }
+
+    @media (max-width: 950px) {
+      .universe {
+        min-height: 1040px;
+        display: block;
+        padding: 24px 14px 78px;
+      }
+
+      .center-card {
+        margin: 0 auto 18px;
+        width: min(270px, 82vw);
+      }
+
+      .orbit { display: none; }
+
+      .node {
+        position: relative;
+        inset: auto !important;
+        transform: none !important;
+        width: 100%;
+        max-width: 620px;
+        margin: 10px auto;
+        min-height: 78px;
+        display: grid;
+        grid-template-columns: 45px 1fr;
+        column-gap: 12px;
+        align-items: center;
+      }
+
+      .node:hover, .node:focus {
+        transform: translateY(-3px) !important;
+      }
+
+      .node .icon {
+        margin: 0;
+        grid-row: span 2;
+      }
+
+      .node p { font-size: 12px; }
+
+      .hint {
+        bottom: 18px;
+        width: calc(100% - 28px);
+        text-align: center;
+      }
+
+      .info-row {
+        grid-template-columns: 1fr;
+      }
+
+      .course {
+        text-align: left;
+      }
+
+      .topbar {
+        border-radius: 24px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      header { padding-top: 18px; }
+      .hero { padding-top: 28px; }
+      h1 { letter-spacing: -1.3px; }
+      .subtitle { font-size: 16px; }
+      .brand { width: 100%; }
+      .course { font-size: 12px; }
+      .modal { padding: 18px; border-radius: 22px; }
+      .modal-top { align-items: flex-start; }
+      .modal-icon { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <div class="brand" aria-label="Identidad de la presentación">
+        <div class="logo">YPF</div>
+        <div>
+          <strong>Mapa interactivo académico</strong>
+          <small>Derecho de Minería y Energía</small>
+        </div>
+      </div>
+      <div class="course">
+        Profesor: <strong>Daniel G. L. Von Kluges</strong><br />
+        Exposición universitaria sobre YPF y sistema energético argentino
+      </div>
+    </div>
+
+    <section class="hero">
+      <div class="eyebrow"><span></span> Tocá cada órbita para desplegar su explicación</div>
+      <h1><span class="gradient-text">YPF 360°</span></h1>
+      <p class="subtitle">
+        Una mirada visual e interactiva para comprender que YPF no es solo una estación de servicio:
+        es subsuelo, derecho, inversión, industria, tecnología, ambiente y soberanía energética.
+      </p>
+    </section>
+  </header>
+
+  <main class="container">
+    <section class="universe-wrap" aria-label="Universo interactivo de YPF">
+      <div class="universe">
+        <div class="orbit one"></div>
+        <div class="orbit two"></div>
+        <div class="orbit three"></div>
+
+        <div class="center-card" aria-hidden="true">
+          <div>
+            <strong>YPF</strong>
+            <span>Del subsuelo al mundo: energía, soberanía, ambiente y desarrollo</span>
+          </div>
+        </div>
+
+        <button class="node n1" data-id="vaca" aria-label="Abrir explicación sobre Vaca Muerta">
+          <span class="icon">⛰️</span>
+          <h3>Vaca Muerta</h3>
+          <p>Recurso no convencional y eje estratégico.</p>
+        </button>
+
+        <button class="node n2" data-id="produccion" aria-label="Abrir explicación sobre exploración y producción">
+          <span class="icon">🛢️</span>
+          <h3>Exploración y producción</h3>
+          <p>Upstream, permisos, concesiones y extracción.</p>
+        </button>
+
+        <button class="node n3" data-id="infraestructura" aria-label="Abrir explicación sobre transporte e infraestructura">
+          <span class="icon">🔗</span>
+          <h3>Transporte e infraestructura</h3>
+          <p>Ductos, logística y conexión territorial.</p>
+        </button>
+
+        <button class="node n4" data-id="refinacion" aria-label="Abrir explicación sobre refinación e industria">
+          <span class="icon">🏭</span>
+          <h3>Refinación e industria</h3>
+          <p>Combustibles, derivados y valor agregado.</p>
+        </button>
+
+        <button class="node n5" data-id="estaciones" aria-label="Abrir explicación sobre estaciones y servicios">
+          <span class="icon">⛽</span>
+          <h3>Estaciones, Full y App</h3>
+          <p>La cara visible de una cadena mucho mayor.</p>
+        </button>
+
+        <button class="node n6" data-id="gasquimica" aria-label="Abrir explicación sobre gas y química">
+          <span class="icon">⚗️</span>
+          <h3>YPF Gas y Química</h3>
+          <p>GLP, petroquímica e insumos productivos.</p>
+        </button>
+
+        <button class="node n7" data-id="agroflotas" aria-label="Abrir explicación sobre agro, minería y flotas">
+          <span class="icon">🚚</span>
+          <h3>Agro, minería y flotas</h3>
+          <p>Energía para sectores productivos.</p>
+        </button>
+
+        <button class="node n8" data-id="luz" aria-label="Abrir explicación sobre YPF Luz y transición energética">
+          <span class="icon">💡</span>
+          <h3>YPF Luz y transición</h3>
+          <p>Electricidad, renovables y diversificación.</p>
+        </button>
+
+        <button class="node n9" data-id="rigi" aria-label="Abrir explicación sobre RIGI y exportación">
+          <span class="icon">🌍</span>
+          <h3>RIGI y exportación</h3>
+          <p>Inversión, Vaca Muerta y mercado global.</p>
+        </button>
+
+        <button class="node n10" data-id="derecho" aria-label="Abrir explicación sobre derecho, ambiente y soberanía">
+          <span class="icon">⚖️</span>
+          <h3>Derecho, ambiente y soberanía</h3>
+          <p>Constitución, leyes y límites jurídicos.</p>
+        </button>
+
+        <div class="hint">La estación de servicio es solo una puerta de entrada al universo YPF.</div>
+      </div>
+    </section>
+
+    <section class="info-row">
+      <article class="box">
+        <h2>Idea central</h2>
+        <p>
+          Este recorrido muestra a YPF como un caso testigo del Derecho de Minería y Energía:
+          conecta recursos naturales, dominio provincial, política energética nacional, inversión,
+          abastecimiento, exportación, ambiente y vida cotidiana.
+        </p>
+        <div class="chips" aria-label="Conceptos principales">
+          <span class="chip">Art. 124 CN</span>
+          <span class="chip">Art. 41 CN</span>
+          <span class="chip">Ley 17.319</span>
+          <span class="chip">Ley 26.741</span>
+          <span class="chip">Ley 27.007</span>
+          <span class="chip">Ley 27.742 / RIGI</span>
+        </div>
+      </article>
+
+      <aside class="box">
+        <h2>Integrantes</h2>
+        <div class="members">
+          <strong>Renata Flores</strong><br />
+          <strong>Ana Martinez</strong><br />
+          <strong>Ramiro Escalante</strong><br />
+          <strong>Iña Ordoqui</strong><br />
+          <strong>Mariano Perez</strong><br />
+          <strong>Jonatan Mac Dougall</strong>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <footer>
+    Mapa interactivo de apoyo para exposición oral. Material académico de síntesis.
+  </footer>
+
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <article class="modal">
+      <div class="modal-top">
+        <div class="modal-icon" id="modalIcon" aria-hidden="true">⛰️</div>
+        <div class="modal-title-wrap">
+          <h2 id="modalTitle">Título</h2>
+          <span class="tag" id="modalTag">Eje temático</span>
+        </div>
+        <button class="close" id="closeBtn" aria-label="Cerrar explicación">×</button>
+      </div>
+      <p id="modalBody"></p>
+      <div class="key" id="modalKey"></div>
+      <div class="legal" id="modalLegal"></div>
+      <div class="modal-actions">
+        <button class="next-btn" id="prevBtn">← Anterior</button>
+        <button class="next-btn" id="nextBtn">Siguiente →</button>
+      </div>
+    </article>
+  </div>
+
+  <script>
+    const items = {
+      vaca: {
+        icon: "⛰️",
+        title: "Vaca Muerta",
+        tag: "Recurso estratégico",
+        body: "Vaca Muerta es una formación geológica ubicada principalmente en Neuquén y representa uno de los grandes ejes de los hidrocarburos no convencionales en Argentina. Para YPF es central porque concentra producción, inversión, tecnología y posibilidad exportadora.",
+        key: "Importancia: permite discutir seguridad energética, ingreso de divisas, infraestructura y desarrollo federal.",
+        legal: "Vínculo jurídico: art. 124 CN sobre dominio originario provincial, Ley 17.319 de hidrocarburos y Ley 27.007 sobre no convencionales."
+      },
+      produccion: {
+        icon: "🛢️",
+        title: "Exploración y producción",
+        tag: "Upstream",
+        body: "Esta etapa comprende la búsqueda, perforación y extracción de petróleo y gas. No se trata de una actividad libre: requiere permisos, concesiones, inversión de riesgo, controles técnicos y cumplimiento de reglas estatales.",
+        key: "Importancia: sin exploración y producción no hay recurso disponible para abastecimiento, industria ni exportación.",
+        legal: "Vínculo jurídico: Ley 17.319, permisos de exploración, concesiones de explotación, canon, regalías y autoridad de aplicación."
+      },
+      infraestructura: {
+        icon: "🔗",
+        title: "Transporte e infraestructura",
+        tag: "Midstream",
+        body: "El petróleo y el gas no tienen valor práctico si quedan aislados bajo tierra. La infraestructura permite transportar, almacenar y conectar la producción con refinerías, centros de consumo, puertos y mercados internacionales.",
+        key: "Importancia: Vaca Muerta depende de ductos, logística y obras capaces de convertir el recurso en energía efectiva.",
+        legal: "Vínculo jurídico: autorizaciones de transporte, regulación de infraestructura, coordinación Nación-provincias y control sobre actividades interjurisdiccionales."
+      },
+      refinacion: {
+        icon: "🏭",
+        title: "Refinación e industria",
+        tag: "Downstream",
+        body: "La refinación transforma el crudo en combustibles y otros productos derivados. Esta etapa muestra que YPF no solo extrae recursos, sino que también participa en la industrialización y en la generación de valor agregado.",
+        key: "Importancia: conecta el recurso natural con productos indispensables para transporte, producción, comercio y vida cotidiana.",
+        legal: "Vínculo jurídico: regulación energética, seguridad industrial, abastecimiento interno, normas ambientales y controles sobre calidad de combustibles."
+      },
+      estaciones: {
+        icon: "⛽",
+        title: "Estaciones, Full y App YPF",
+        tag: "Cara visible",
+        body: "Las estaciones de servicio son la imagen más cotidiana de YPF, junto con servicios como Full, Boxes y la App YPF. Pero representan solo el tramo final de una cadena que empieza en el subsuelo y atraviesa producción, transporte, refinación y comercialización.",
+        key: "Importancia: permiten conectar el tema con la vida diaria del usuario: movilidad, consumo, pagos digitales y servicios.",
+        legal: "Vínculo jurídico: defensa del consumidor, abastecimiento, seguridad, control de combustibles y regulación comercial."
+      },
+      gasquimica: {
+        icon: "⚗️",
+        title: "YPF Gas y YPF Química",
+        tag: "Derivados e insumos",
+        body: "YPF también abarca gas licuado, productos petroquímicos e insumos que se utilizan en hogares, industrias y cadenas productivas. Esto amplía la mirada: los hidrocarburos no terminan en la nafta, sino que se transforman en múltiples bienes y servicios.",
+        key: "Importancia: muestra la presencia de YPF en la industria, la producción y el abastecimiento energético más allá del surtidor.",
+        legal: "Vínculo jurídico: régimen energético, regulación de gas, seguridad de productos, normas ambientales y responsabilidad por la actividad."
+      },
+      agroflotas: {
+        icon: "🚚",
+        title: "Agro, minería y flotas",
+        tag: "Sectores productivos",
+        body: "YPF provee soluciones energéticas para el campo, el transporte, la minería, la logística y las flotas empresariales. Esto permite ver a la energía como condición de funcionamiento de la economía real.",
+        key: "Importancia: sin energía no hay producción agropecuaria, transporte de cargas, actividad minera ni abastecimiento territorial.",
+        legal: "Vínculo jurídico: contratos, abastecimiento, regulación energética, seguridad, responsabilidad y política pública de desarrollo."
+      },
+      luz: {
+        icon: "💡",
+        title: "YPF Luz y transición energética",
+        tag: "Diversificación energética",
+        body: "La transición energética obliga a pensar más allá del petróleo y el gas. YPF, a través de nuevas unidades y proyectos energéticos, también se vincula con electricidad, eficiencia, renovables y diversificación de la matriz.",
+        key: "Importancia: plantea el desafío de financiar el presente hidrocarburífero sin perder de vista el futuro energético.",
+        legal: "Vínculo jurídico: derecho de la energía, marcos regulatorios eléctricos, ambiente, sustentabilidad y políticas de transición."
+      },
+      rigi: {
+        icon: "🌍",
+        title: "RIGI y exportación",
+        tag: "Inversión y mercado global",
+        body: "El RIGI aparece como una herramienta para atraer grandes inversiones. En el caso de YPF, se vincula con proyectos de desarrollo de Vaca Muerta, infraestructura, aumento de producción y exportación de petróleo.",
+        key: "Importancia: conecta el tema local con el mundo: precios internacionales, seguridad energética, ingreso de divisas y competencia global.",
+        legal: "Vínculo jurídico: Ley 27.742, régimen de incentivos, estabilidad normativa, inversiones estratégicas y tensión entre autoabastecimiento y exportación."
+      },
+      derecho: {
+        icon: "⚖️",
+        title: "Derecho, ambiente y soberanía",
+        tag: "Marco jurídico",
+        body: "YPF permite estudiar cómo el Derecho ordena un recurso estratégico. Entran en juego el dominio provincial de los recursos, la política energética nacional, la soberanía hidrocarburífera, la inversión privada y la obligación de proteger el ambiente.",
+        key: "Importancia: el centro del debate no es solo económico, sino jurídico y político: quién decide, quién controla, quién invierte, quién se beneficia y qué límites ambientales existen.",
+        legal: "Vínculo jurídico: art. 124 CN, art. 41 CN, Ley 17.319, Ley 26.197, Ley 26.741, Ley 25.675 y régimen ambiental aplicable."
+      }
+    };
+
+    const order = ["vaca", "produccion", "infraestructura", "refinacion", "estaciones", "gasquimica", "agroflotas", "luz", "rigi", "derecho"];
+    let currentIndex = 0;
+
+    const overlay = document.getElementById("overlay");
+    const closeBtn = document.getElementById("closeBtn");
+    const modalIcon = document.getElementById("modalIcon");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalTag = document.getElementById("modalTag");
+    const modalBody = document.getElementById("modalBody");
+    const modalKey = document.getElementById("modalKey");
+    const modalLegal = document.getElementById("modalLegal");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+
+    function openItem(id) {
+      const item = items[id];
+      currentIndex = order.indexOf(id);
+      modalIcon.textContent = item.icon;
+      modalTitle.textContent = item.title;
+      modalTag.textContent = item.tag;
+      modalBody.textContent = item.body;
+      modalKey.textContent = item.key;
+      modalLegal.textContent = item.legal;
+      overlay.classList.add("show");
+      closeBtn.focus();
+    }
+
+    function closeModal() {
+      overlay.classList.remove("show");
+    }
+
+    function openByOffset(offset) {
+      currentIndex = (currentIndex + offset + order.length) % order.length;
+      openItem(order[currentIndex]);
+    }
+
+    document.querySelectorAll(".node").forEach(node => {
+      node.addEventListener("click", () => openItem(node.dataset.id));
+    });
+
+    closeBtn.addEventListener("click", closeModal);
+    prevBtn.addEventListener("click", () => openByOffset(-1));
+    nextBtn.addEventListener("click", () => openByOffset(1));
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeModal();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (!overlay.classList.contains("show")) return;
+      if (e.key === "Escape") closeModal();
+      if (e.key === "ArrowRight") openByOffset(1);
+      if (e.key === "ArrowLeft") openByOffset(-1);
+    });
+  </script>
+</body>
+</html>
