@@ -547,6 +547,49 @@
       background: rgba(97,211,255,.14);
     }
 
+
+    .sound-panel {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 15;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+    }
+
+    .sound-toggle {
+      border: 1px solid rgba(97,211,255,.28);
+      background: rgba(6, 24, 45, .9);
+      color: #e9f8ff;
+      padding: 11px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-weight: 750;
+      font-size: 13px;
+      box-shadow: 0 14px 34px rgba(0,0,0,.28);
+      backdrop-filter: blur(12px);
+    }
+
+    .sound-toggle:hover,
+    .sound-toggle:focus {
+      outline: 2px solid rgba(97,211,255,.38);
+      background: rgba(10, 45, 78, .96);
+    }
+
+    .sound-toggle.active {
+      border-color: rgba(66,212,139,.45);
+      background: rgba(22, 89, 70, .78);
+    }
+
+    @media (max-width: 520px) {
+      .sound-panel {
+        right: 12px;
+        bottom: 12px;
+      }
+    }
+
     @media (max-width: 950px) {
       .universe {
         min-height: 1040px;
@@ -758,7 +801,18 @@
     Mapa interactivo de apoyo para exposición oral. Material académico de síntesis.
   </footer>
 
-  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <audio id="bgMusic" src="audio/musica-fondo-ypf.mp3" preload="auto" loop autoplay></audio>
+
+  <div class="sound-panel" aria-label="Controles de sonido">
+    <button class="sound-toggle active" id="musicToggle" type="button" aria-pressed="true">
+      🎵 Música activada
+    </button>
+    <button class="sound-toggle active" id="clickToggle" type="button" aria-pressed="true">
+      ✨ Clicks futuristas
+    </button>
+  </div>
+
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <article class="modal">
       <div class="modal-top">
         <div class="modal-icon" id="modalIcon" aria-hidden="true">⛰️</div>
@@ -779,6 +833,149 @@
   </div>
 
   <script>
+    // Música MP3 + clicks futuristas.
+    // Nota técnica: los navegadores suelen bloquear música automática hasta que el usuario toque la pantalla.
+    // Por eso se intenta autoplay y, si se bloquea, el mismo botón sirve para iniciar.
+    let audioCtx = null;
+    let clickSoundsEnabled = true;
+    let musicEnabled = true;
+
+    const bgMusic = document.getElementById("bgMusic");
+    const clickToggle = document.getElementById("clickToggle");
+    const musicToggle = document.getElementById("musicToggle");
+
+    if (bgMusic) {
+      bgMusic.volume = 0.32;
+      bgMusic.loop = true;
+      bgMusic.muted = false;
+    }
+
+    function initAudio() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    async function ensureAudioReady() {
+      initAudio();
+      if (audioCtx.state === "suspended") {
+        try { await audioCtx.resume(); } catch (err) {}
+      }
+    }
+
+    async function tryPlayMusic() {
+      if (!bgMusic || !musicEnabled) return;
+      try {
+        await bgMusic.play();
+        musicToggle.classList.add("active");
+        musicToggle.setAttribute("aria-pressed", "true");
+        musicToggle.textContent = "🎵 Música activada";
+      } catch (err) {
+        musicToggle.classList.remove("active");
+        musicToggle.setAttribute("aria-pressed", "false");
+        musicToggle.textContent = "▶ Iniciar música";
+      }
+    }
+
+    // Intento de autoplay. En muchos celulares se bloqueará hasta el primer toque.
+    window.addEventListener("load", () => {
+      tryPlayMusic();
+    });
+
+    // En el primer toque/click general de la página, intenta iniciar la música si estaba bloqueada.
+    document.addEventListener("pointerdown", () => {
+      if (musicEnabled && bgMusic && bgMusic.paused) {
+        tryPlayMusic();
+      }
+    }, { once: true });
+
+    async function playClickSound(type = "open") {
+      if (!clickSoundsEnabled) return;
+      await ensureAudioReady();
+      if (!audioCtx || audioCtx.state !== "running") return;
+
+      const now = audioCtx.currentTime;
+      const output = audioCtx.createGain();
+      output.gain.setValueAtTime(0.0001, now);
+      output.gain.exponentialRampToValueAtTime(0.32, now + 0.008);
+      output.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+      output.connect(audioCtx.destination);
+
+      const settings = {
+        open:  [620, 1240, 0.20],
+        close: [430,  215, 0.16],
+        nav:   [760, 1520, 0.18],
+        toggle:[980, 1960, 0.18]
+      }[type] || [700, 1400, 0.18];
+
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const filter = audioCtx.createBiquadFilter();
+
+      osc1.type = "triangle";
+      osc2.type = "sine";
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(1100, now);
+      filter.frequency.exponentialRampToValueAtTime(2600, now + 0.12);
+      filter.Q.value = 9;
+
+      osc1.frequency.setValueAtTime(settings[0], now);
+      osc1.frequency.exponentialRampToValueAtTime(settings[1], now + settings[2]);
+      osc2.frequency.setValueAtTime(settings[0] * 1.5, now + 0.018);
+      osc2.frequency.exponentialRampToValueAtTime(settings[1] * 0.75, now + settings[2]);
+
+      osc1.connect(filter);
+      osc2.connect(filter);
+      filter.connect(output);
+
+      const bufferSize = Math.floor(audioCtx.sampleRate * 0.07);
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize / 4));
+      }
+      const noise = audioCtx.createBufferSource();
+      const noiseGain = audioCtx.createGain();
+      const noiseFilter = audioCtx.createBiquadFilter();
+      noiseFilter.type = "highpass";
+      noiseFilter.frequency.value = 2500;
+      noiseGain.gain.value = 0.045;
+      noise.buffer = buffer;
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(output);
+
+      osc1.start(now);
+      osc2.start(now + 0.014);
+      noise.start(now);
+      osc1.stop(now + settings[2] + 0.03);
+      osc2.stop(now + settings[2] + 0.03);
+      noise.stop(now + 0.08);
+    }
+
+    musicToggle.addEventListener("click", async () => {
+      if (!bgMusic) return;
+      if (bgMusic.paused) {
+        musicEnabled = true;
+        await tryPlayMusic();
+        await playClickSound("toggle");
+      } else {
+        bgMusic.pause();
+        musicEnabled = false;
+        musicToggle.classList.remove("active");
+        musicToggle.setAttribute("aria-pressed", "false");
+        musicToggle.textContent = "▶ Iniciar música";
+        await playClickSound("close");
+      }
+    });
+
+    clickToggle.addEventListener("click", async () => {
+      clickSoundsEnabled = !clickSoundsEnabled;
+      clickToggle.classList.toggle("active", clickSoundsEnabled);
+      clickToggle.setAttribute("aria-pressed", String(clickSoundsEnabled));
+      clickToggle.textContent = clickSoundsEnabled ? "✨ Clicks futuristas" : "🔇 Clicks apagados";
+      if (clickSoundsEnabled) await playClickSound("toggle");
+    });
+
     const items = {
       vaca: {
         icon: "⛰️",
@@ -877,6 +1074,7 @@
     const nextBtn = document.getElementById("nextBtn");
 
     function openItem(id) {
+      playClickSound("open");
       const item = items[id];
       currentIndex = order.indexOf(id);
       modalIcon.textContent = item.icon;
@@ -890,10 +1088,12 @@
     }
 
     function closeModal() {
+      playClickSound("close");
       overlay.classList.remove("show");
     }
 
     function openByOffset(offset) {
+      playClickSound("nav");
       currentIndex = (currentIndex + offset + order.length) % order.length;
       openItem(order[currentIndex]);
     }
