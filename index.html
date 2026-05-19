@@ -801,7 +801,7 @@
     Mapa interactivo de apoyo para exposición oral. Material académico de síntesis.
   </footer>
 
-  <audio id="bgMusic" src="audio/musica-fondo-ypf.mp3" preload="auto" loop></audio>
+  <audio id="bgMusic" src="audio/musica-fondo-ypf.mp3" preload="auto" loop autoplay></audio>
 
   <div class="sound-panel" aria-label="Controles de sonido">
     <button class="sound-toggle active" id="musicToggle" type="button" aria-pressed="true">
@@ -833,172 +833,154 @@
   </div>
 
   <script>
-  // Música MP3 + clicks futuristas.
-// Versión estable: la música se inicia desde el botón o desde el primer toque real del usuario.
+    // Música MP3 + clicks futuristas.
+    // Nota técnica: los navegadores suelen bloquear música automática hasta que el usuario toque la pantalla.
+    // Por eso se intenta autoplay y, si se bloquea, el mismo botón sirve para iniciar.
+    let audioCtx = null;
+    let clickSoundsEnabled = true;
+    let musicEnabled = true;
 
-let audioCtx = null;
-let clickSoundsEnabled = true;
-let musicEnabled = true;
+    const bgMusic = document.getElementById("bgMusic");
+    const clickToggle = document.getElementById("clickToggle");
+    const musicToggle = document.getElementById("musicToggle");
 
-const bgMusic = document.getElementById("bgMusic");
-const clickToggle = document.getElementById("clickToggle");
-const musicToggle = document.getElementById("musicToggle");
+    if (bgMusic) {
+      bgMusic.volume = 0.25;
+      bgMusic.loop = true;
+      bgMusic.muted = false;
+    }
 
-if (bgMusic) {
-  bgMusic.volume = 0.25;
-  bgMusic.loop = true;
-  bgMusic.muted = false;
-}
+    function initAudio() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
 
-function initAudio() {
-  if (audioCtx) return;
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-}
+    async function ensureAudioReady() {
+      initAudio();
+      if (audioCtx.state === "suspended") {
+        try { await audioCtx.resume(); } catch (err) {}
+      }
+    }
 
-async function ensureAudioReady() {
-  initAudio();
-  if (audioCtx.state === "suspended") {
-    try { await audioCtx.resume(); } catch (err) {}
-  }
-}
+    async function tryPlayMusic() {
+      if (!bgMusic || !musicEnabled) return;
+      try {
+        await bgMusic.play();
+        musicToggle.classList.add("active");
+        musicToggle.setAttribute("aria-pressed", "true");
+        musicToggle.textContent = "🎵 Música activada";
+      } catch (err) {
+        // No apagamos musicEnabled acá: si lo hacemos, el primer toque posterior no vuelve a intentar reproducir.
+        musicToggle.classList.remove("active");
+        musicToggle.setAttribute("aria-pressed", "false");
+        musicToggle.textContent = "▶ Iniciar música";
+      }
+    }
 
-async function startMusic() {
-  if (!bgMusic) return false;
+    // Intento de autoplay. En muchos celulares se bloqueará hasta el primer toque.
+    window.addEventListener("load", () => {
+      tryPlayMusic();
+    });
 
-  try {
-    bgMusic.muted = false;
-    bgMusic.volume = 0.25;
-    bgMusic.loop = true;
+    // Primer toque/click real: intenta iniciar la música aunque el autoplay previo haya fallado.
+    // Usamos captura para que se ejecute antes del click en los botones/cards.
+    async function unlockMusicOnce() {
+      if (bgMusic && bgMusic.paused) {
+        musicEnabled = true;
+        await tryPlayMusic();
+      }
+    }
 
-    await bgMusic.play();
+    document.addEventListener("pointerup", unlockMusicOnce, { once: true, capture: true });
+    document.addEventListener("touchend", unlockMusicOnce, { once: true, capture: true });
 
-    musicEnabled = true;
-    musicToggle.classList.add("active");
-    musicToggle.setAttribute("aria-pressed", "true");
-    musicToggle.textContent = "🎵 Música activada";
+    async function playClickSound(type = "open") {
+      if (!clickSoundsEnabled) return;
+      await ensureAudioReady();
+      if (!audioCtx || audioCtx.state !== "running") return;
 
-    return true;
-  } catch (err) {
-    musicEnabled = false;
-    musicToggle.classList.remove("active");
-    musicToggle.setAttribute("aria-pressed", "false");
-    musicToggle.textContent = "▶ Iniciar música";
+      const now = audioCtx.currentTime;
+      const output = audioCtx.createGain();
+      output.gain.setValueAtTime(0.0001, now);
+      output.gain.exponentialRampToValueAtTime(0.70, now + 0.008);
+      output.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+      output.connect(audioCtx.destination);
 
-    return false;
-  }
-}
+      const settings = {
+        open:  [620, 1240, 0.20],
+        close: [430,  215, 0.16],
+        nav:   [760, 1520, 0.18],
+        toggle:[980, 1960, 0.18]
+      }[type] || [700, 1400, 0.18];
 
-async function playClickSound(type = "open") {
-  if (!clickSoundsEnabled) return;
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const filter = audioCtx.createBiquadFilter();
 
-  await ensureAudioReady();
+      osc1.type = "triangle";
+      osc2.type = "sine";
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(1100, now);
+      filter.frequency.exponentialRampToValueAtTime(2600, now + 0.12);
+      filter.Q.value = 9;
 
-  if (!audioCtx || audioCtx.state !== "running") return;
+      osc1.frequency.setValueAtTime(settings[0], now);
+      osc1.frequency.exponentialRampToValueAtTime(settings[1], now + settings[2]);
+      osc2.frequency.setValueAtTime(settings[0] * 1.5, now + 0.018);
+      osc2.frequency.exponentialRampToValueAtTime(settings[1] * 0.75, now + settings[2]);
 
-  const now = audioCtx.currentTime;
-  const output = audioCtx.createGain();
+      osc1.connect(filter);
+      osc2.connect(filter);
+      filter.connect(output);
 
-  output.gain.setValueAtTime(0.0001, now);
-  output.gain.exponentialRampToValueAtTime(0.70, now + 0.008);
-  output.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-  output.connect(audioCtx.destination);
+      const bufferSize = Math.floor(audioCtx.sampleRate * 0.07);
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize / 4));
+      }
+      const noise = audioCtx.createBufferSource();
+      const noiseGain = audioCtx.createGain();
+      const noiseFilter = audioCtx.createBiquadFilter();
+      noiseFilter.type = "highpass";
+      noiseFilter.frequency.value = 2500;
+      noiseGain.gain.value = 0.10;
+      noise.buffer = buffer;
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(output);
 
-  const settings = {
-    open:  [620, 1240, 0.20],
-    close: [430,  215, 0.16],
-    nav:   [760, 1520, 0.18],
-    toggle:[980, 1960, 0.18]
-  }[type] || [700, 1400, 0.18];
+      osc1.start(now);
+      osc2.start(now + 0.014);
+      noise.start(now);
+      osc1.stop(now + settings[2] + 0.03);
+      osc2.stop(now + settings[2] + 0.03);
+      noise.stop(now + 0.08);
+    }
 
-  const osc1 = audioCtx.createOscillator();
-  const osc2 = audioCtx.createOscillator();
-  const filter = audioCtx.createBiquadFilter();
+    musicToggle.addEventListener("click", async () => {
+      if (!bgMusic) return;
+      if (bgMusic.paused) {
+        musicEnabled = true;
+        await tryPlayMusic();
+        await playClickSound("toggle");
+      } else {
+        bgMusic.pause();
+        musicEnabled = false;
+        musicToggle.classList.remove("active");
+        musicToggle.setAttribute("aria-pressed", "false");
+        musicToggle.textContent = "▶ Iniciar música";
+        await playClickSound("close");
+      }
+    });
 
-  osc1.type = "triangle";
-  osc2.type = "sine";
-  filter.type = "bandpass";
-  filter.frequency.setValueAtTime(1100, now);
-  filter.frequency.exponentialRampToValueAtTime(2600, now + 0.12);
-  filter.Q.value = 9;
-
-  osc1.frequency.setValueAtTime(settings[0], now);
-  osc1.frequency.exponentialRampToValueAtTime(settings[1], now + settings[2]);
-
-  osc2.frequency.setValueAtTime(settings[0] * 1.5, now + 0.018);
-  osc2.frequency.exponentialRampToValueAtTime(settings[1] * 0.75, now + settings[2]);
-
-  osc1.connect(filter);
-  osc2.connect(filter);
-  filter.connect(output);
-
-  const bufferSize = Math.floor(audioCtx.sampleRate * 0.07);
-  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-  const data = buffer.getChannelData(0);
-
-  for (let i = 0; i < bufferSize; i++) {
-    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize / 4));
-  }
-
-  const noise = audioCtx.createBufferSource();
-  const noiseGain = audioCtx.createGain();
-  const noiseFilter = audioCtx.createBiquadFilter();
-
-  noiseFilter.type = "highpass";
-  noiseFilter.frequency.value = 2500;
-  noiseGain.gain.value = 0.10;
-  noise.buffer = buffer;
-
-  noise.connect(noiseFilter);
-  noiseFilter.connect(noiseGain);
-  noiseGain.connect(output);
-
-  osc1.start(now);
-  osc2.start(now + 0.014);
-  noise.start(now);
-
-  osc1.stop(now + settings[2] + 0.03);
-  osc2.stop(now + settings[2] + 0.03);
-  noise.stop(now + 0.08);
-}
-
-// Primer toque real en la página: intenta iniciar la música.
-document.addEventListener("click", async () => {
-  if (bgMusic && bgMusic.paused) {
-    await startMusic();
-  }
-}, { once: true });
-
-// Botón manual de música.
-musicToggle.addEventListener("click", async (e) => {
-  e.stopPropagation();
-
-  if (!bgMusic) return;
-
-  if (bgMusic.paused) {
-    await startMusic();
-    await playClickSound("toggle");
-  } else {
-    bgMusic.pause();
-    musicEnabled = false;
-    musicToggle.classList.remove("active");
-    musicToggle.setAttribute("aria-pressed", "false");
-    musicToggle.textContent = "▶ Iniciar música";
-    await playClickSound("close");
-  }
-});
-
-// Botón de clicks.
-clickToggle.addEventListener("click", async (e) => {
-  e.stopPropagation();
-
-  clickSoundsEnabled = !clickSoundsEnabled;
-
-  clickToggle.classList.toggle("active", clickSoundsEnabled);
-  clickToggle.setAttribute("aria-pressed", String(clickSoundsEnabled));
-  clickToggle.textContent = clickSoundsEnabled ? "✨ Clicks futuristas" : "🔇 Clicks apagados";
-
-  if (clickSoundsEnabled) await playClickSound("toggle");
-});
+    clickToggle.addEventListener("click", async () => {
+      clickSoundsEnabled = !clickSoundsEnabled;
+      clickToggle.classList.toggle("active", clickSoundsEnabled);
+      clickToggle.setAttribute("aria-pressed", String(clickSoundsEnabled));
+      clickToggle.textContent = clickSoundsEnabled ? "✨ Clicks futuristas" : "🔇 Clicks apagados";
+      if (clickSoundsEnabled) await playClickSound("toggle");
+    });
 
     const items = {
       vaca: {
